@@ -1,0 +1,4 @@
+nltk
+spacy
+transformers
+flask
