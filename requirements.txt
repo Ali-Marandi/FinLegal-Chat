@@ -1,4 +1,10 @@
-nltk
-spacy
-transformers
 flask
+langchain
+langchain-openai
+langchain-community
+pypdf
+faiss-cpu
+openai
+tiktoken
+python-dotenv
+werkzeug

@@ -1,6 +1,5 @@
-def process_legal_documents():
-    # Placeholder for legal document processing logic
-    print("Legal document processing logic will go here.")
+from app import app
 
 if __name__ == "__main__":
-    process_legal_documents()
+    print("Starting FinLegal Chat Server...")
+    app.run(host='0.0.0.0', port=5000)
