@@ -1,55 +1,46 @@
-# FinLegal Chat ⚖️💰
+# ⚖️ FinLegal-Chat: Advanced AI Legal & Financial Assistant
 
-**FinLegal Chat** is a commercial-grade AI assistant designed for deep analysis of financial and legal documents. Built with LangChain and state-of-the-art Large Language Models (LLMs), it provides a robust RAG (Retrieval-Augmented Generation) pipeline to help professionals navigate complex contracts and filings.
+**FinLegal-Chat** is a commercial-grade desktop application designed for professionals in the finance and legal sectors. It leverages advanced AI (RAG) to analyze complex documents, identify risks, and answer detailed queries with high precision.
+
+---
 
 ## 🚀 Key Features
 
-- **Smart RAG Engine**: Ingests PDF and Text documents with high-fidelity indexing using FAISS and OpenAI Embeddings.
-- **Interactive Analysis**: Query your documents in natural language to extract clauses, identify risks, and summarize sections.
-- **Financial Context Aware**: Optimized for understanding financial terminology and legal jargon.
-- **Modern Web Interface**: A clean, responsive UI built with Flask and Tailwind CSS.
-- **Secure Processing**: Handles sensitive documents locally within the session context.
+### 🖥️ Modern Desktop Experience
+- **Beautiful UI**: Built with a sleek, dark-themed Flet (Flutter-based) interface for a premium look and feel.
+- **Standalone Executable**: Distributed as a portable Windows `.exe`—no Python installation required.
+- **Cross-Format Support**: Seamlessly analyze **PDF**, **DOCX**, and **TXT** documents.
+
+### 🧠 Advanced AI Engine
+- **Conversational Intelligence**: Maintains full context of your conversation for follow-up questions.
+- **Precision RAG**: Optimized text chunking strategies specifically tuned for legal clauses and financial data.
+- **Multi-Document Analysis**: Ingest multiple documents simultaneously and query across all of them.
+
+### 🔒 Security & Control
+- **BYOK (Bring Your Own Key)**: Directly manage your OpenAI API key within the application for full control over your usage and costs.
+- **Session-Based Privacy**: Ingested data and chat history are kept within the active session.
+
+---
+
+## 📥 Installation & Usage
+
+1. **Download**: Go to the [Releases](https://github.com/Ali-Marandi/FinLegal-Chat/releases) page and download the latest `FinLegal-Chat.exe`.
+2. **Launch**: Run the `.exe` file on your Windows machine.
+3. **Configure**: Enter your **OpenAI API Key** in the sidebar and click "Save Key".
+4. **Analyze**: Upload your legal or financial documents and start chatting!
+
+---
 
 ## 🛠️ Technology Stack
 
-- **Backend**: Python, Flask
-- **AI/LLM**: LangChain, OpenAI (GPT-4o)
-- **Vector DB**: FAISS (Facebook AI Similarity Search)
-- **Document Processing**: PyPDF, Recursive Text Splitting
+- **Frontend**: Flet (Python/Flutter)
+- **AI Framework**: LangChain
+- **Language Model**: OpenAI GPT-4o
+- **Vector Database**: FAISS
+- **Automation**: GitHub Actions (CI/CD)
 
-## 📦 Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Ali-Marandi/FinLegal-Chat.git
-   cd FinLegal-Chat
-   ```
-
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Set up environment variables:
-   Create a `.env` file and add your OpenAI API Key:
-   ```env
-   OPENAI_API_KEY=your_api_key_here
-   ```
-
-4. Run the application:
-   ```bash
-   python app.py
-   ```
-
-## 📖 Usage
-
-1. Open the web interface (default: `http://localhost:5000`).
-2. Upload your PDF or Text legal documents via the sidebar.
-3. Start chatting! Ask questions like:
-   - "What are the termination clauses in this contract?"
-   - "Summarize the financial liabilities mentioned in Section 4."
-   - "Are there any indemnity risks for the service provider?"
+---
 
 ## 📄 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. Developed with ❤️ by Manus AI.
