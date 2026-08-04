@@ -2,6 +2,7 @@ flet
 langchain
 langchain-openai
 langchain-community
+langgraph
 pypdf
 faiss-cpu
 openai
@@ -9,3 +10,8 @@ tiktoken
 python-dotenv
 docx2txt
 pyinstaller
+plotly
+kaleido
+matplotlib
+llama-parse
+unstructured
