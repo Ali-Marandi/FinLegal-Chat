@@ -3,13 +3,13 @@ import os
 import shutil
 import plotly.graph_objects as go
 from flet.plotly_chart import PlotlyChart
-from src.engine import FinLegalEngine
+from src.engine import FinLegalEmpireEngine as FinLegalEngine
 
 def main(page: ft.Page):
-    page.title = "FinLegal-Chat Pro | Agentic AI Assistant"
+    page.title = "FinLegal-Chat Empire | Supreme AI Command Center"
     page.theme_mode = ft.ThemeMode.DARK
-    page.window_width = 1200
-    page.window_height = 900
+    page.window_width = 1400
+    page.window_height = 1000
     page.padding = 0
     page.spacing = 0
     page.fonts = {
@@ -163,8 +163,8 @@ def main(page: ft.Page):
     sidebar = ft.Container(
         content=ft.Column([
             ft.Row([
-                ft.Icon(ft.icons.ACCOUNT_BALANCE_WALLET, color="blue", size=30),
-                ft.Text("FinLegal Pro", size=22, weight="bold")
+                ft.Icon(ft.icons.STADIUM_ROUNDED, color=ft.colors.AMBER_400, size=35),
+                ft.Text("FinLegal Empire", size=24, weight="bold", color=ft.colors.AMBER_400)
             ]),
             ft.Divider(height=40, color="white10"),
             ft.Text("CONFIGURATION", size=12, weight="bold", color="white38"),
@@ -203,7 +203,7 @@ def main(page: ft.Page):
         content=ft.Column([
             ft.Container(
                 content=ft.Column([
-                    ft.Text("Agentic Analysis Environment", size=14, color="white38"),
+                    ft.Text("Supreme Command Center - Council of Experts Active", size=14, color=ft.colors.AMBER_200, weight="bold"),
                     loading_indicator
                 ]),
                 padding=ft.padding.only(left=20, right=20, top=10)
