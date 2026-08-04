@@ -1,4 +1,4 @@
-flask
+flet
 langchain
 langchain-openai
 langchain-community
@@ -7,4 +7,5 @@ faiss-cpu
 openai
 tiktoken
 python-dotenv
-werkzeug
+docx2txt
+pyinstaller
