@@ -9,8 +9,9 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import StateGraph, END
+from src.automation import DocumentAutomator
 
-# --- Advanced State Definition ---
+# --- Ultimate State Definition ---
 class AgentState(TypedDict):
     question: str
     documents: List[str]
@@ -20,27 +21,27 @@ class AgentState(TypedDict):
     market_intelligence: str
     final_consensus: str
     chart_data: Dict
+    language: str
     steps: List[str]
 
-class FinLegalEmpireEngine:
+class FinLegalUltimateEngine:
     def __init__(self, mode="openai", local_url="http://localhost:11434"):
         self.mode = mode
         if mode == "openai":
             self.embeddings = OpenAIEmbeddings()
             self.llm = ChatOpenAI(model_name="gpt-4o", temperature=0)
-            self.creative_llm = ChatOpenAI(model_name="gpt-4o", temperature=0.7)
         else:
             from langchain_community.embeddings import OllamaEmbeddings
             from langchain_community.chat_models import ChatOllama
             self.embeddings = OllamaEmbeddings(base_url=local_url, model="llama3")
             self.llm = ChatOllama(base_url=local_url, model="llama3", temperature=0)
-            self.creative_llm = self.llm
             
         self.vector_store = None
-        self.workflow = self._build_empire_workflow()
+        self.workflow = self._build_ultimate_workflow()
+        self.automator = DocumentAutomator()
 
     def ingest_document(self, file_path: str):
-        """Ultra-high fidelity ingestion."""
+        """Ultra-high fidelity ingestion with format detection."""
         if file_path.endswith('.pdf'):
             loader = PyPDFLoader(file_path)
         elif file_path.endswith('.docx') or file_path.endswith('.doc'):
@@ -50,8 +51,8 @@ class FinLegalEmpireEngine:
         
         documents = loader.load()
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1500,
-            chunk_overlap=250,
+            chunk_size=2000,
+            chunk_overlap=300,
             separators=["\n\n", "\n", " ", ""]
         )
         texts = text_splitter.split_documents(documents)
@@ -61,18 +62,16 @@ class FinLegalEmpireEngine:
         else:
             self.vector_store.add_documents(texts)
 
-    def _build_empire_workflow(self):
+    def _build_ultimate_workflow(self):
         workflow = StateGraph(AgentState)
 
-        # Define specialized expert nodes
         workflow.add_node("retrieve", self._retrieve)
         workflow.add_node("legal_expert", self._legal_expert)
         workflow.add_node("financial_expert", self._financial_expert)
-        workflow.add_node("risk_manager", self._risk_manager)
         workflow.add_node("market_researcher", self._market_researcher)
+        workflow.add_node("risk_manager", self._risk_manager)
         workflow.add_node("aggregator", self._aggregator)
 
-        # Build graph: Parallel analysis -> Aggregation
         workflow.set_entry_point("retrieve")
         workflow.add_edge("retrieve", "legal_expert")
         workflow.add_edge("retrieve", "financial_expert")
@@ -86,14 +85,13 @@ class FinLegalEmpireEngine:
         return workflow.compile()
 
     def _retrieve(self, state: AgentState):
-        docs = self.vector_store.as_retriever(search_kwargs={"k": 8}).invoke(state["question"])
+        docs = self.vector_store.as_retriever(search_kwargs={"k": 10}).invoke(state["question"])
         return {"documents": docs}
 
     def _legal_expert(self, state: AgentState):
         prompt = ChatPromptTemplate.from_template(
-            "You are a Senior Legal Counsel. Analyze the following context for legal implications, "
-            "compliance issues, and contractual obligations related to the question.\n"
-            "Context: {context}\nQuestion: {question}"
+            "You are a Supreme Legal AI. Analyze the context in its original language (Persian/English/etc.) "
+            "and provide a detailed legal opinion. \nContext: {context}\nQuestion: {question}"
         )
         context = "\n\n".join([d.page_content for d in state["documents"]])
         res = self.llm.invoke(prompt.format(context=context, question=state["question"]))
@@ -101,21 +99,15 @@ class FinLegalEmpireEngine:
 
     def _financial_expert(self, state: AgentState):
         prompt = ChatPromptTemplate.from_template(
-            "You are a Senior Financial Analyst. Extract and analyze financial figures, "
-            "market trends, and fiscal health indicators from the context.\n"
-            "Context: {context}\nQuestion: {question}"
+            "You are a Global Financial Strategist. Analyze fiscal data and trends. \nContext: {context}\nQuestion: {question}"
         )
         context = "\n\n".join([d.page_content for d in state["documents"]])
         res = self.llm.invoke(prompt.format(context=context, question=state["question"]))
         return {"financial_analysis": res.content}
 
     def _market_researcher(self, state: AgentState):
-        # In a real empire edition, we'd use a search tool here. 
-        # For now, we simulate high-level market intelligence reasoning.
         prompt = ChatPromptTemplate.from_template(
-            "You are a Market Intelligence Expert. Based on the documents and the question, "
-            "provide external market context and regulatory environment analysis.\n"
-            "Context: {context}\nQuestion: {question}"
+            "You are an Omni-Market Analyst. Evaluate global trends and regulatory shifts. \nContext: {context}\nQuestion: {question}"
         )
         context = "\n\n".join([d.page_content for d in state["documents"]])
         res = self.llm.invoke(prompt.format(context=context, question=state["question"]))
@@ -123,22 +115,20 @@ class FinLegalEmpireEngine:
 
     def _risk_manager(self, state: AgentState):
         prompt = ChatPromptTemplate.from_template(
-            "You are a Chief Risk Officer. Review the legal opinion and financial analysis. "
-            "Identify hidden risks, potential liabilities, and adversarial scenarios.\n"
-            "Legal: {legal}\nFinancial: {financial}\nQuestion: {question}"
+            "You are a Master of Risk. Identify all potential threats and adversarial outcomes. \nLegal: {legal}\nFinancial: {financial}\nMarket: {market}"
         )
         res = self.llm.invoke(prompt.format(
             legal=state.get("legal_opinion", ""),
             financial=state.get("financial_analysis", ""),
-            question=state["question"]
+            market=state.get("market_intelligence", ""),
         ))
         return {"risk_assessment": res.content}
 
     def _aggregator(self, state: AgentState):
         prompt = ChatPromptTemplate.from_template(
-            "You are the Lead Strategist. Synthesize the findings from the Legal, Financial, Market, and Risk experts "
-            "into a single, incomparable executive summary. \n"
-            "If figures exist, provide a chart JSON: {\"type\": \"bar|line\", \"title\": \"...\", \"labels\": [], \"values\": []}\n"
+            "You are the Ultimate AI Strategist. Synthesize all findings into a supreme executive report. "
+            "Detect the user's language and respond in that language. \n"
+            "Include chart JSON if applicable: {\"type\": \"bar|line\", \"title\": \"...\", \"labels\": [], \"values\": []}\n"
             "Legal: {legal}\nFinancial: {financial}\nMarket: {market}\nRisk: {risk}\nQuestion: {question}"
         )
         res = self.llm.invoke(prompt.format(
@@ -149,7 +139,6 @@ class FinLegalEmpireEngine:
             question=state["question"]
         ))
         
-        # Chart extraction logic
         chart_data = None
         try:
             match = re.search(r'\{.*"values".*\}', res.content, re.DOTALL)
@@ -170,14 +159,34 @@ class FinLegalEmpireEngine:
         inputs = {"question": question, "steps": []}
         result = self.workflow.invoke(inputs)
         
-        # Combine expert opinions into a detailed report
-        full_report = f"### 🛡️ Legal Perspective\n{result['legal_opinion']}\n\n" \
-                      f"### 📊 Financial Analysis\n{result['financial_analysis']}\n\n" \
+        full_report = f"### 🛡️ Legal Core\n{result['legal_opinion']}\n\n" \
+                      f"### 📊 Financial Matrix\n{result['financial_analysis']}\n\n" \
                       f"### 🌐 Market Intelligence\n{result['market_intelligence']}\n\n" \
-                      f"### ⚠️ Risk Assessment\n{result['risk_assessment']}\n\n" \
-                      f"### 🏛️ Executive Consensus\n{result['final_consensus']}"
+                      f"### ⚠️ Risk Mitigation\n{result['risk_assessment']}\n\n" \
+                      f"### 🏛️ Supreme Consensus\n{result['final_consensus']}"
         
-        return {"answer": full_report, "chart": result.get("chart_data")}
+        # Automation: Generate report files
+        report_dir = "reports"
+        os.makedirs(report_dir, exist_ok=True)
+        word_path = os.path.join(report_dir, "Ultimate_Analysis.docx")
+        self.automator.create_legal_report("Supreme Analysis Report", {
+            "Legal Core": result['legal_opinion'],
+            "Financial Matrix": result['financial_analysis'],
+            "Market Intelligence": result['market_intelligence'],
+            "Risk Mitigation": result['risk_assessment'],
+            "Supreme Consensus": result['final_consensus']
+        }, word_path)
+
+        excel_path = None
+        if result.get("chart_data"):
+            excel_path = os.path.join(report_dir, "Financial_Data.xlsx")
+            self.automator.create_financial_spreadsheet(result["chart_data"], excel_path)
+        
+        return {
+            "answer": full_report, 
+            "chart": result.get("chart_data"),
+            "reports": {"word": word_path, "excel": excel_path}
+        }
 
     def reset(self):
         self.vector_store = None
