@@ -1,51 +1,34 @@
-# ♾️ FinLegal-Chat: Ultimate Edition (The Omni-Potent AI)
+# FinLegal-Chat
 
-**FinLegal-Chat Ultimate** is the final evolution of intelligent assistants. It is no longer just a chatbot; it is a **comprehensive digital empire** that masters every aspect of legal, financial, and administrative workflows. Engineered for the elite, it combines multi-agent reasoning with full-scale document automation and multimedia intelligence.
+Desktop prototype for **licensed lawyers and in-house counsel** to ask questions about uploaded financial or legal documents (PDF, DOCX, TXT).
 
----
+**This is not a lawyer. It is not legal advice.** Do not rely on an answer until a qualified lawyer has reviewed it.
 
-## 🚀 The Ultimate Advantage (Omni-Potent Features)
+**این خروجی هوش مصنوعی است، مشاوره حقوقی نیست، و باید توسط وکیل دارای پروانه بررسی شود.**
 
-### 🏛️ Supreme Council of Experts
-Every query is processed by an elite team of specialized AI agents:
-- **Supreme Legal AI**: Master of contracts, compliance, and international law.
-- **Global Financial Strategist**: Expert in fiscal matrices, trend forecasting, and data extraction.
-- **Omni-Market Analyst**: Monitors global shifts and regulatory changes.
-- **Master of Risk**: Anticipates adversarial outcomes and hidden liabilities.
-- **Ultimate AI Strategist**: Synthesizes everything into a perfect executive consensus.
+## What it does
 
-### 🤖 Automation & Execution (The "All-Rounder")
-- **DocGen Engine**: Automatically generates professional **Word (.docx)** reports and **Excel (.xlsx)** spreadsheets based on your analysis.
-- **Visual Intelligence**: Transforms data into stunning, interactive **Plotly charts**.
-- **Multi-Lingual Mastery**: Native-level support for Persian, English, Arabic, and more.
+- Upload PDF / DOCX / TXT
+- Index the text with FAISS
+- Answer with GPT-4o (cloud) or Llama 3 through local Ollama
+- Optionally export a Word or Excel summary
 
-### 🔒 Absolute Security
-- **Hybrid Core**: Seamlessly switch between the power of **Empire Cloud (GPT-4o)** and the absolute privacy of **Local Mode (Ollama/Llama 3)**.
+It does not represent a client, file anything with a court, or replace a licensed professional.
 
-### 🖥️ Ultimate Command Center
-- A high-resolution, high-performance interface designed for the most demanding professionals.
-- Integrated file hub for managing ingested assets and generated reports.
+## Run
 
----
+```bash
+pip install -r requirements.txt
+export OPENAI_API_KEY=...   # cloud mode
+python main.py
+```
 
-## 📥 Deployment & Conquest
+Local mode expects Ollama at `http://localhost:11434` with Llama 3.
 
-1. **Download**: Get the `FinLegal-Chat-Ultimate.exe` from the [Releases](https://github.com/Ali-Marandi/FinLegal-Chat/releases) page.
-2. **Initialize**: Launch the Command Center and activate the core with your API Key or Local Mode.
-3. **Command**: Ingest any document (PDF, DOCX, TXT) and let the Ultimate Engine execute your tasks.
+## Stack
 
----
+Flet, LangChain / LangGraph, FAISS, OpenAI or Ollama, python-docx, openpyxl.
 
-## 🛠️ Technology Stack (Ultimate Core)
+## License
 
-- **Frontend**: Flet (Ultimate UI Framework)
-- **Agent Orchestration**: LangGraph (Multi-Agent DAG)
-- **Intelligence Engine**: OpenAI GPT-4o / Ollama (Llama 3)
-- **Automation**: Python-Docx, OpenPyXL, Plotly
-- **Vector Engine**: FAISS (High-Performance Indexing)
-
----
-
-## 📄 License
-
-Distributed under the MIT License. Developed for those who demand perfection by Manus AI.
+MIT

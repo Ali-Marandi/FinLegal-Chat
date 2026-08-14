@@ -11,7 +11,12 @@ from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import StateGraph, END
 from src.automation import DocumentAutomator
 
-# --- Ultimate State Definition ---
+NOT_LEGAL_ADVICE = (
+    "You are a document-analysis assistant, not a lawyer. "
+    "Do not claim to give legal advice or to replace a licensed professional. "
+    "If you are unsure, say so. Cite the source text when you make a claim."
+)
+
 class AgentState(TypedDict):
     question: str
     documents: List[str]
@@ -35,20 +40,20 @@ class FinLegalUltimateEngine:
             from langchain_community.chat_models import ChatOllama
             self.embeddings = OllamaEmbeddings(base_url=local_url, model="llama3")
             self.llm = ChatOllama(base_url=local_url, model="llama3", temperature=0)
-            
+
         self.vector_store = None
         self.workflow = self._build_ultimate_workflow()
         self.automator = DocumentAutomator()
 
     def ingest_document(self, file_path: str):
-        """Ultra-high fidelity ingestion with format detection."""
+        """Load PDF, DOCX, or text and add chunks to FAISS."""
         if file_path.endswith('.pdf'):
             loader = PyPDFLoader(file_path)
         elif file_path.endswith('.docx') or file_path.endswith('.doc'):
             loader = Docx2txtLoader(file_path)
         else:
             loader = TextLoader(file_path)
-        
+
         documents = loader.load()
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=2000,
@@ -56,7 +61,7 @@ class FinLegalUltimateEngine:
             separators=["\n\n", "\n", " ", ""]
         )
         texts = text_splitter.split_documents(documents)
-        
+
         if self.vector_store is None:
             self.vector_store = FAISS.from_documents(texts, self.embeddings)
         else:
@@ -90,8 +95,9 @@ class FinLegalUltimateEngine:
 
     def _legal_expert(self, state: AgentState):
         prompt = ChatPromptTemplate.from_template(
-            "You are a Supreme Legal AI. Analyze the context in its original language (Persian/English/etc.) "
-            "and provide a detailed legal opinion. \nContext: {context}\nQuestion: {question}"
+            NOT_LEGAL_ADVICE +
+            " Read the context in its original language (Persian, English, or other) "
+            "and note contract or legal issues as a first-pass review.\nContext: {context}\nQuestion: {question}"
         )
         context = "\n\n".join([d.page_content for d in state["documents"]])
         res = self.llm.invoke(prompt.format(context=context, question=state["question"]))
@@ -99,7 +105,8 @@ class FinLegalUltimateEngine:
 
     def _financial_expert(self, state: AgentState):
         prompt = ChatPromptTemplate.from_template(
-            "You are a Global Financial Strategist. Analyze fiscal data and trends. \nContext: {context}\nQuestion: {question}"
+            NOT_LEGAL_ADVICE +
+            " Note fiscal figures, payment terms, and financial trends in the context.\nContext: {context}\nQuestion: {question}"
         )
         context = "\n\n".join([d.page_content for d in state["documents"]])
         res = self.llm.invoke(prompt.format(context=context, question=state["question"]))
@@ -107,7 +114,8 @@ class FinLegalUltimateEngine:
 
     def _market_researcher(self, state: AgentState):
         prompt = ChatPromptTemplate.from_template(
-            "You are an Omni-Market Analyst. Evaluate global trends and regulatory shifts. \nContext: {context}\nQuestion: {question}"
+            NOT_LEGAL_ADVICE +
+            " Note market or regulatory points that appear in the context. Do not invent news.\nContext: {context}\nQuestion: {question}"
         )
         context = "\n\n".join([d.page_content for d in state["documents"]])
         res = self.llm.invoke(prompt.format(context=context, question=state["question"]))
@@ -115,7 +123,8 @@ class FinLegalUltimateEngine:
 
     def _risk_manager(self, state: AgentState):
         prompt = ChatPromptTemplate.from_template(
-            "You are a Master of Risk. Identify all potential threats and adversarial outcomes. \nLegal: {legal}\nFinancial: {financial}\nMarket: {market}"
+            NOT_LEGAL_ADVICE +
+            " List potential risks from the notes below. Flag uncertainty.\nLegal: {legal}\nFinancial: {financial}\nMarket: {market}"
         )
         res = self.llm.invoke(prompt.format(
             legal=state.get("legal_opinion", ""),
@@ -126,9 +135,9 @@ class FinLegalUltimateEngine:
 
     def _aggregator(self, state: AgentState):
         prompt = ChatPromptTemplate.from_template(
-            "You are the Ultimate AI Strategist. Synthesize all findings into a supreme executive report. "
-            "Detect the user's language and respond in that language. \n"
-            "Include chart JSON if applicable: {\"type\": \"bar|line\", \"title\": \"...\", \"labels\": [], \"values\": []}\n"
+            NOT_LEGAL_ADVICE +
+            " Combine the notes into a short first-pass summary. Answer in the user's language. "
+            "If chart JSON applies, include: {{\"type\": \"bar|line\", \"title\": \"...\", \"labels\": [], \"values\": []}}\n"
             "Legal: {legal}\nFinancial: {financial}\nMarket: {market}\nRisk: {risk}\nQuestion: {question}"
         )
         res = self.llm.invoke(prompt.format(
@@ -138,7 +147,7 @@ class FinLegalUltimateEngine:
             risk=state["risk_assessment"],
             question=state["question"]
         ))
-        
+
         chart_data = None
         try:
             match = re.search(r'\{.*"values".*\}', res.content, re.DOTALL)
@@ -147,7 +156,7 @@ class FinLegalUltimateEngine:
                 clean_content = res.content.replace(match.group(), "").strip()
             else:
                 clean_content = res.content
-        except:
+        except Exception:
             clean_content = res.content
 
         return {"final_consensus": clean_content, "chart_data": chart_data}
@@ -155,35 +164,37 @@ class FinLegalUltimateEngine:
     def query(self, question: str) -> Dict:
         if self.vector_store is None:
             return {"answer": "Please upload documents first.", "chart": None}
-        
+
         inputs = {"question": question, "steps": []}
         result = self.workflow.invoke(inputs)
-        
-        full_report = f"### 🛡️ Legal Core\n{result['legal_opinion']}\n\n" \
-                      f"### 📊 Financial Matrix\n{result['financial_analysis']}\n\n" \
-                      f"### 🌐 Market Intelligence\n{result['market_intelligence']}\n\n" \
-                      f"### ⚠️ Risk Mitigation\n{result['risk_assessment']}\n\n" \
-                      f"### 🏛️ Supreme Consensus\n{result['final_consensus']}"
-        
-        # Automation: Generate report files
+
+        full_report = (
+            "_AI first-pass. Not legal advice. A lawyer must review this._\n\n"
+            f"### Legal notes\n{result['legal_opinion']}\n\n"
+            f"### Financial notes\n{result['financial_analysis']}\n\n"
+            f"### Market notes\n{result['market_intelligence']}\n\n"
+            f"### Risk notes\n{result['risk_assessment']}\n\n"
+            f"### Summary\n{result['final_consensus']}"
+        )
+
         report_dir = "reports"
         os.makedirs(report_dir, exist_ok=True)
-        word_path = os.path.join(report_dir, "Ultimate_Analysis.docx")
-        self.automator.create_legal_report("Supreme Analysis Report", {
-            "Legal Core": result['legal_opinion'],
-            "Financial Matrix": result['financial_analysis'],
-            "Market Intelligence": result['market_intelligence'],
-            "Risk Mitigation": result['risk_assessment'],
-            "Supreme Consensus": result['final_consensus']
+        word_path = os.path.join(report_dir, "analysis.docx")
+        self.automator.create_legal_report("First-pass analysis (not legal advice)", {
+            "Legal notes": result['legal_opinion'],
+            "Financial notes": result['financial_analysis'],
+            "Market notes": result['market_intelligence'],
+            "Risk notes": result['risk_assessment'],
+            "Summary": result['final_consensus']
         }, word_path)
 
         excel_path = None
         if result.get("chart_data"):
             excel_path = os.path.join(report_dir, "Financial_Data.xlsx")
             self.automator.create_financial_spreadsheet(result["chart_data"], excel_path)
-        
+
         return {
-            "answer": full_report, 
+            "answer": full_report,
             "chart": result.get("chart_data"),
             "reports": {"word": word_path, "excel": excel_path}
         }
