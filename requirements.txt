@@ -15,3 +15,6 @@ kaleido
 matplotlib
 llama-parse
 unstructured
+python-docx
+openpyxl
+pandas
