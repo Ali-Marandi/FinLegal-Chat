@@ -1,0 +1,65 @@
+{
+  "name": "finlegal-chat-desktop",
+  "version": "0.2.0",
+  "description": "FinLegal-Chat enterprise desktop workspace for evidence-first legal and financial analysis",
+  "main": "src/main.js",
+  "homepage": "https://github.com/Ali-Marandi/FinLegal-Chat",
+  "author": {
+    "name": "FinLegal-Chat",
+    "email": "engineering@finlegal.example"
+  },
+  "license": "MIT",
+  "private": true,
+  "build": {
+    "appId": "com.finlegal.chat",
+    "productName": "FinLegal-Chat Enterprise Workspace",
+    "asar": true,
+    "removePackageScripts": true,
+    "npmRebuild": false,
+    "compression": "maximum",
+    "linux": {
+      "category": "Office",
+      "maintainer": "FinLegal-Chat <engineering@finlegal.example>",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "publisherName": "FinLegal-Chat",
+      "verifyUpdateCodeSignature": true
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FinLegal-Chat Enterprise Workspace",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.business",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    }
+  },
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --linux AppImage --linux deb",
+    "dist:windows": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:dir": "electron-builder --dir --linux"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}
