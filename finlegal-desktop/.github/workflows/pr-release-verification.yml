@@ -1,0 +1,161 @@
+name: Pull request release verification
+
+on:
+  pull_request:
+    paths:
+      - 'finlegal-desktop/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+# Pull requests must not receive repository-write or signing permissions.
+permissions:
+  contents: read
+
+concurrency:
+  group: finlegal-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22.13.0'
+
+defaults:
+  run:
+    working-directory: finlegal-desktop
+
+jobs:
+  static-release-policy:
+    name: Static release-policy checks
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: finlegal-desktop/package-lock.json
+
+      - name: Install dependencies from lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Validate JavaScript syntax
+        run: |
+          node --check src/main.js
+          node --check src/preload.js
+          node --check src/renderer/app.js
+
+      - name: Verify lockfile and production dependency policy
+        run: |
+          npm install --package-lock-only --ignore-scripts --ignore-workspace-root-check
+          git diff --exit-code -- finlegal-desktop/package-lock.json
+          npm audit --audit-level=high --omit=dev
+
+      - name: Verify release workflow hardening policy
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow='finlegal-desktop/.github/workflows/release-v020.yml'
+          test -f "$workflow"
+          ! grep -Eq 'uses: [^@]+@(main|master|v[0-9]+|[0-9]+)' "$workflow"
+          grep -q 'permissions:' "$workflow"
+          grep -q 'contents: read' "$workflow"
+          grep -q 'actions/attest@' "$workflow"
+          grep -q 'attestations: write' "$workflow"
+          grep -q 'id-token: write' "$workflow"
+          ! grep -q 'ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES' "$workflow"
+          ! grep -q -- '--clobber' "$workflow"
+          grep -q 'verify-tag' "$workflow"
+          echo 'Release workflow policy checks passed.'
+
+  linux-build-and-validate:
+    name: Linux build and local artifact validation
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: finlegal-desktop/package-lock.json
+
+      - name: Install dependencies from lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Build unsigned Linux smoke artifacts
+        run: npm run dist -- --publish never
+
+      - name: Generate local hash manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum dist/*.AppImage dist/*.deb > dist/SHA256SUMS-linux.txt
+          printf '{"version":"%s","source_sha":"%s","platform":"linux-x64","artifacts":[' "$(node -p "require('./package.json').version")" "$(git rev-parse HEAD)" > dist/release-manifest-linux.json
+          first=1
+          for file in dist/*.AppImage dist/*.deb; do
+            [[ $first -eq 0 ]] && printf ',' >> dist/release-manifest-linux.json
+            first=0
+            hash="$(sha256sum "$file" | cut -d' ' -f1)"
+            size="$(stat -c '%s' "$file")"
+            printf '{"name":"%s","sha256":"%s","size":%s}' "$(basename "$file")" "$hash" "$size" >> dist/release-manifest-linux.json
+          done
+          printf ']}\n' >> dist/release-manifest-linux.json
+
+      - name: Validate hashes and manifests locally
+        run: scripts/validate-release.sh --assets dist
+
+      - name: Upload PR validation evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finlegal-pr-release-evidence-${{ github.event.pull_request.number || github.run_number }}
+          path: |
+            finlegal-desktop/dist/SHA256SUMS-linux.txt
+            finlegal-desktop/dist/release-manifest-linux.json
+          if-no-files-found: error
+          retention-days: 14
+
+  provenance-verification-instructions:
+    name: Provenance verification guardrail
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Confirm release provenance gate exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow='finlegal-desktop/.github/workflows/release-v020.yml'
+          grep -q 'actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6' "$workflow"
+          grep -q 'attestations: write' "$workflow"
+          grep -q 'id-token: write' "$workflow"
+          grep -q 'gh release create' "$workflow"
+          grep -q 'Immutable publishing refuses replacement' "$workflow"
+          echo 'Release provenance and immutability gates are present.'
+
+      - name: Explain PR provenance boundary
+        shell: bash
+        run: |
+          cat <<'EOF'
+          Pull-request builds validate deterministic hashes and manifests locally.
+          Production artifact attestations are generated only by the protected release workflow
+          after review, signing, platform verification, and environment approval. This avoids
+          granting signing or provenance-publishing authority to untrusted pull-request code.
+          EOF
