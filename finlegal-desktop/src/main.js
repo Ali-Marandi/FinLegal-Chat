@@ -4,6 +4,13 @@ const fs = require('fs');
 
 const workspacePath = path.join(app.getPath('userData'), 'workspace.json');
 const allowedExtensions = new Set(['pdf', 'docx', 'txt', 'md', 'csv']);
+const smokeTest = process.env.FINLEGAL_SMOKE_TEST === '1';
+const smokeReportPath = process.env.FINLEGAL_SMOKE_REPORT || '';
+
+function writeSmokeReport(report) {
+  if (!smokeTest || !smokeReportPath) return;
+  fs.writeFileSync(smokeReportPath, JSON.stringify(report, null, 2), { encoding: 'utf8', mode: 0o600 });
+}
 
 function readWorkspace() {
   try {
@@ -51,6 +58,22 @@ function isAllowedDocument(filePath) {
 }
 
 function createWindow() {
+  const smokeReport = {
+    appStarted: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false
+    },
+    renderer: {},
+    ipcPersistence: false,
+    newWindowBlocked: false,
+    navigationBlocked: false
+  };
+  writeSmokeReport(smokeReport);
+
   const win = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -69,9 +92,36 @@ function createWindow() {
     }
   });
 
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.setWindowOpenHandler(() => {
+    smokeReport.newWindowBlocked = true;
+    writeSmokeReport(smokeReport);
+    return { action: 'deny' };
+  });
   win.webContents.on('will-navigate', (event, url) => {
-    if (!url.startsWith('file://')) event.preventDefault();
+    if (!url.startsWith('file://')) {
+      event.preventDefault();
+      smokeReport.navigationBlocked = true;
+      writeSmokeReport(smokeReport);
+    }
+  });
+  win.webContents.on('did-finish-load', async () => {
+    if (!smokeTest) return;
+    try {
+      const renderer = await win.webContents.executeJavaScript(`({
+        requireType: typeof require,
+        processType: typeof process,
+        finlegalBridge: typeof window.finlegal
+      })`);
+      smokeReport.renderer = renderer;
+      const persistence = await win.webContents.executeJavaScript(`window.finlegal.saveWorkspace({documents:[{name:'smoke-test.txt',path:'C:/smoke-test.txt',status:'Ready for analysis'}],analyses:[]}).then(() => window.finlegal.loadWorkspace())`);
+      smokeReport.ipcPersistence = Array.isArray(persistence?.documents) && persistence.documents[0]?.name === 'smoke-test.txt';
+      await win.webContents.executeJavaScript(`window.open('https://example.com')`);
+      win.loadURL('https://example.com').catch(() => {});
+      setTimeout(() => writeSmokeReport(smokeReport), 500);
+    } catch (error) {
+      smokeReport.error = error.message;
+      writeSmokeReport(smokeReport);
+    }
   });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }

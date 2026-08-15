@@ -56,7 +56,8 @@
     "dist": "electron-builder --linux AppImage --linux deb",
     "dist:windows": "electron-builder --win nsis",
     "dist:mac": "electron-builder --mac dmg",
-    "dist:dir": "electron-builder --dir --linux"
+    "dist:dir": "electron-builder --dir --linux",
+    "test:smoke": "node scripts/electron-smoke-test.js"
   },
   "devDependencies": {
     "electron": "^31.0.0",
