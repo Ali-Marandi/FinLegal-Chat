@@ -64,7 +64,7 @@ log_json() {
 critical_job_failure() {
   local run_id="$1"
   local jobs
-  jobs="$(gh run view "$run_id" --repo "$REPO" --json jobs --jq '.jobs[] | {name,status,conclusion}' 2>/dev/null || true)"
+  jobs="$(gh api "repos/${REPO}/actions/runs/${run_id}/jobs?per_page=100" --jq '.jobs[] | {name,status,conclusion}' 2>/dev/null || true)"
   [[ -n "$jobs" ]] || return 1
   printf '%s\n' "$jobs" | jq -s -e '
     any(.[]; (.name | ascii_downcase | test("windows|macos|publish|attest|provenance|sign")) and (.status == "completed") and (.conclusion != "success"))
@@ -82,12 +82,20 @@ handle_terminal_failure() {
 
 last_seen="${SINCE_RUN_ID:-0}"
 while true; do
-  runs="$(gh run list --repo "$REPO" --branch "$BRANCH" --limit 20 --json databaseId,status,conclusion,workflowName,headSha,createdAt,url 2>/dev/null)" || {
+  branch_query="$(printf '%s' "$BRANCH" | jq -sRr @uri)"
+  runs="$(gh api "repos/${REPO}/actions/runs?branch=${branch_query}&per_page=20" --jq '[.workflow_runs[] | {databaseId:.id,status,conclusion,workflowName:.name,headSha:.head_sha,createdAt:.created_at,url:.html_url}]' 2>/dev/null | sed $'s/\\x1b\\[[0-9;]*m//g')" || {
     log_json error "" "unknown" "unknown" "" "Unable to query GitHub Actions runs" >&2
     [[ "$ONCE" -eq 1 ]] && exit 1
     sleep "$INTERVAL"
     continue
   }
+
+  if ! jq -e 'type == "array"' <<< "$runs" >/dev/null 2>&1; then
+    log_json error "" "unknown" "unknown" "" "GitHub API returned malformed run data" >&2
+    [[ "$ONCE" -eq 1 ]] && exit 1
+    sleep "$INTERVAL"
+    continue
+  fi
 
   found_new=0
   while IFS= read -r run; do
