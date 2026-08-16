@@ -102,3 +102,12 @@ FinLegal should name the release commander, publish the partner enablement packa
 [2]: ../FinLegal-Chat_GSI_Deal_Registration_and_Conflict_Escalation_Policy.md "FinLegal-Chat GSI deal registration and conflict escalation policy"
 [3]: ../FinLegal-Chat_v0.2.0_Customer_Release_Notes.md "FinLegal-Chat v0.2.0 customer release notes"
 [4]: ../FinLegal-Chat_Enterprise_Client_Code_Signing_and_Provenance_Briefing.md "FinLegal-Chat enterprise code-signing and provenance briefing"
+
+
+## Global roadmap alignment
+
+The global commercial roadmap has been reviewed and incorporated into the rollout program. It reinforces the need to coordinate GSI engineering enablement with market validation, regional data-flow and residency review, localization, customer support, pricing and implementation economics, legal/IP review, and long-term operating capacity.
+
+It does not change the release-integrity controls. GSI teams must continue to verify the approved artifact’s hash, platform signature, notarization where applicable, and provenance before installation or redistribution. Commercial, regional, and marketing readiness does not substitute for security, customer approval, tenant-isolation, or release-evidence gates.
+
+The next rollout-planning action is to assign an owner and acceptance criteria for each region and customer pilot, then record whether the deployment is a preview, controlled pilot, or production enterprise release.
