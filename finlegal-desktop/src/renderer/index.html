@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <title>FinLegal-Chat Enterprise Workspace</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-lockup">
+        <div class="brand-mark">F</div>
+        <div>
+          <div class="brand-name">FinLegal</div>
+          <div class="brand-subtitle">Enterprise workspace</div>
+        </div>
+      </div>
+
+      <nav class="nav-stack" aria-label="Primary navigation">
+        <button class="nav-item active" data-view="overview"><span class="nav-icon">⌂</span>Overview</button>
+        <button class="nav-item" data-view="documents"><span class="nav-icon">▤</span>Documents</button>
+        <button class="nav-item" data-view="analysis"><span class="nav-icon">◈</span>Analysis runs</button>
+        <button class="nav-item" data-view="controls"><span class="nav-icon">◉</span>Controls & audit</button>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+      <div class="tenant-card">
+        <div class="eyebrow">ACTIVE TENANT</div>
+        <strong>Northstar Financial</strong>
+        <span class="tenant-region">EU-West · Production</span>
+        <div class="tenant-status"><span class="status-dot"></span>All systems operational</div>
+      </div>
+      <div class="user-row">
+        <div class="avatar">AM</div>
+        <div><strong>Alex Morgan</strong><span>Compliance lead</span></div>
+        <span class="more">•••</span>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <div class="breadcrumb">Workspace <span>/</span> Executive overview</div>
+          <h1 id="page-title">Executive overview</h1>
+        </div>
+        <div class="topbar-actions">
+          <div class="secure-pill"><span class="secure-icon">▣</span>Encrypted workspace</div>
+          <div class="release-pill">Preview · v0.2.0</div>
+          <button class="icon-button" title="Notifications">♢<span class="notification-dot"></span></button>
+          <button class="outline-button" id="open-settings">Workspace settings</button>
+        </div>
+      </header>
+
+      <section class="view active" id="overview-view">
+        <div class="hero-banner">
+          <div>
+            <div class="eyebrow teal">EVIDENCE-FIRST ANALYSIS</div>
+            <h2>Make confident decisions<br /><em>with a defensible trail.</em></h2>
+            <p>Review governed findings across legal, financial, market, and risk workflows—anchored to the source material your team trusts.</p>
+            <button class="primary-button" id="hero-upload">Start an analysis <span>→</span></button>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit orbit-three"></div>
+            <div class="hero-core"><span>F</span></div>
+            <div class="signal signal-one">✓</div><div class="signal signal-two">⌁</div><div class="signal signal-three">↗</div>
+          </div>
+        </div>
+
+        <div class="section-heading"><div><div class="eyebrow">WORKSPACE PULSE</div><h3>Decision-readiness at a glance</h3></div><button class="text-button">View audit trail →</button></div>
+        <div class="metric-grid">
+          <article class="metric-card"><div class="metric-top"><span class="metric-label">Documents governed</span><span class="metric-icon blue">▤</span></div><strong>1,248</strong><div class="metric-foot positive">↑ 12.4% <span>vs last month</span></div></article>
+          <article class="metric-card"><div class="metric-top"><span class="metric-label">Open findings</span><span class="metric-icon amber">!</span></div><strong>36</strong><div class="metric-foot warning">8 require review <span>this week</span></div></article>
+          <article class="metric-card"><div class="metric-top"><span class="metric-label">Source acceptance</span><span class="metric-icon green">✓</span></div><strong>94.2%</strong><div class="metric-foot positive">↑ 3.8% <span>quality trend</span></div></article>
+          <article class="metric-card"><div class="metric-top"><span class="metric-label">Audit coverage</span><span class="metric-icon purple">◒</span></div><strong>87%</strong><div class="progress-track"><span style="width:87%"></span></div><div class="metric-foot neutral">Target 90% <span>by quarter end</span></div></article>
+        </div>
+
+        <div class="content-grid">
+          <section class="panel recent-panel"><div class="panel-header"><div><div class="eyebrow">RECENT ACTIVITY</div><h3>Analysis runs</h3></div><button class="text-button" data-view-link="analysis">View all →</button></div><div id="activity-list" class="activity-list"></div></section>
+          <section class="panel readiness-panel"><div class="panel-header"><div><div class="eyebrow">CONTROL HEALTH</div><h3>Readiness posture</h3></div><span class="live-tag"><span></span>Live</span></div><div class="readiness-score"><div class="score-ring"><strong>82</strong><span>/ 100</span></div><div><strong>Healthy with attention</strong><p>Two controls need an owner before the next review.</p></div></div><div class="control-list"><div><span class="control-bullet good">✓</span><span>Identity & access</span><strong>100%</strong></div><div><span class="control-bullet good">✓</span><span>Source traceability</span><strong>96%</strong></div><div><span class="control-bullet warn">!</span><span>Retention policies</span><strong class="amber-text">72%</strong></div></div><button class="secondary-button full" data-view-link="controls">Review controls</button></section>
+        </div>
+      </section>
+
+      <section class="view" id="documents-view"><div class="view-header"><div><div class="eyebrow">DOCUMENT CONTROL</div><h2>Documents</h2><p>Bring governed source material into your workspace.</p></div><button class="primary-button" id="upload-documents">Upload documents <span>＋</span></button></div><div class="dropzone" id="document-dropzone" tabindex="0"><div class="dropzone-icon">＋</div><div><strong>Drop approved sources here</strong><span>PDF, DOCX, TXT, Markdown, and CSV · files remain local to this workspace</span></div><button class="text-button" id="dropzone-browse">Browse files →</button></div><div class="panel table-panel"><div class="table-toolbar"><div class="search-box">⌕ <input id="document-search" placeholder="Search documents" /></div><span class="muted" id="document-count">0 documents</span></div><div class="document-table" id="document-table"></div></div></section>
+
+      <section class="view" id="analysis-view"><div class="view-header"><div><div class="eyebrow">ANALYSIS WORKBENCH</div><h2>Analysis runs</h2><p>Run a governed review across your selected documents.</p></div><button class="primary-button" id="new-analysis">New analysis <span>＋</span></button></div><div class="analysis-layout"><div class="panel analysis-form"><div class="eyebrow">NEW RUN</div><h3>What should we investigate?</h3><textarea id="analysis-question" placeholder="Example: Identify termination rights, change-of-control clauses, and material regulatory obligations."></textarea><div class="analysis-options"><label><input type="checkbox" checked /> Legal review</label><label><input type="checkbox" checked /> Financial lens</label><label><input type="checkbox" checked /> Risk assessment</label><label><input type="checkbox" /> Market context</label></div><button class="primary-button full" id="run-analysis">Run evidence-first analysis <span>→</span></button></div><div class="panel result-preview"><div class="panel-header"><div><div class="eyebrow">LATEST RESULT</div><h3>Decision brief</h3></div><span class="draft-tag">Draft</span></div><div class="result-placeholder"><div class="placeholder-icon">◈</div><strong>Your next brief will appear here</strong><p>Upload documents, add a question, and run an analysis to generate a source-anchored decision brief.</p></div></div></div></section>
+
+      <section class="view" id="controls-view"><div class="view-header"><div><div class="eyebrow">GOVERNANCE CENTER</div><h2>Controls & audit</h2><p>Monitor the controls that keep analysis defensible.</p></div><button class="outline-button">Export evidence pack ↓</button></div><div class="control-grid"><div class="panel control-summary"><div class="eyebrow">CONTROL POSTURE</div><div class="big-posture">82<span>/100</span></div><div class="posture-bar"><span></span></div><p>Healthy with two attention items</p></div><div class="panel"><div class="panel-header"><div><div class="eyebrow">CONTROL REGISTER</div><h3>Coverage by domain</h3></div></div><div class="domain-list"><div><span>Identity & access</span><div class="mini-bar"><i style="width:100%"></i></div><strong>100%</strong></div><div><span>Source traceability</span><div class="mini-bar"><i style="width:96%"></i></div><strong>96%</strong></div><div><span>Data retention</span><div class="mini-bar amber-bar"><i style="width:72%"></i></div><strong class="amber-text">72%</strong></div><div><span>Incident readiness</span><div class="mini-bar"><i style="width:88%"></i></div><strong>88%</strong></div></div></div></div></section>
+    </main>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="./app.js"></script>
+</body>
+</html>

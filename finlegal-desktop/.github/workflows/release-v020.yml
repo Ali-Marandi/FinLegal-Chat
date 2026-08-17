@@ -1,0 +1,447 @@
+name: Build and publish FinLegal-Chat v0.2.0
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the v prefix
+        required: true
+        default: 0.2.0
+        type: string
+  push:
+    tags:
+      - 'v*.*.*'
+
+# Build jobs must never receive repository-write permissions by default.
+permissions:
+  contents: read
+
+concurrency:
+  # One version may have only one active release run. Replacements use a separate
+  # reviewer-gated process and are intentionally not supported here.
+  group: finlegal-release-${{ inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '22.13.0'
+  RELEASE_ENVIRONMENT: release
+
+jobs:
+  validate-release:
+    name: Validate source, tag, and dependency policy
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      source_sha: ${{ steps.source.outputs.source_sha }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve and validate version
+        id: version
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="${REF_NAME#v}"
+          fi
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid version: $VERSION" >&2; exit 1; }
+          TAG="v${VERSION}"
+          if ! git show-ref --tags --verify --quiet "refs/tags/${TAG}"; then
+            echo "Required tag ${TAG} does not exist on the checked-out source." >&2
+            exit 1
+          fi
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" != "$TAG" ]]; then
+            echo "Tag/version mismatch: ${GITHUB_REF_NAME} vs ${TAG}" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Record source revision
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          git show --no-patch --format='%H%n%P%n%s' "$SOURCE_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies from lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Verify lockfile and dependency policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts --ignore-workspace-root-check
+          git diff --exit-code -- package-lock.json
+          npm audit --audit-level=high --omit=dev
+
+      - name: Generate dependency SBOM
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global --no-fund --no-audit @cyclonedx/cyclonedx-npm@1.19.0
+          cyclonedx-npm --output-file dependency-sbom.cdx.json --output-format json
+
+      - name: Upload dependency evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finlegal-dependency-evidence-${{ steps.version.outputs.version }}
+          path: |
+            dependency-sbom.cdx.json
+            package-lock.json
+          if-no-files-found: error
+          retention-days: 30
+
+  build-linux:
+    name: Linux packages
+    needs: validate-release
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies from lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Build AppImage and Debian package
+        run: npm run dist -- --publish never
+
+      - name: Generate Linux hashes and manifest
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+          SOURCE_SHA: ${{ needs.validate-release.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          sha256sum dist/*.AppImage dist/*.deb > dist/SHA256SUMS-linux.txt
+          printf '{"version":"%s","source_sha":"%s","platform":"linux-x64","artifacts":[' "$RELEASE_VERSION" "$SOURCE_SHA" > dist/release-manifest-linux.json
+          first=1
+          for file in dist/*.AppImage dist/*.deb; do
+            [[ $first -eq 0 ]] && printf ',' >> dist/release-manifest-linux.json
+            first=0
+            hash="$(sha256sum "$file" | cut -d' ' -f1)"
+            size="$(stat -c '%s' "$file")"
+            printf '{"name":"%s","sha256":"%s","size":%s}' "$(basename "$file")" "$hash" "$size" >> dist/release-manifest-linux.json
+          done
+          printf ']}\n' >> dist/release-manifest-linux.json
+
+      - name: Generate Linux artifact attestations
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/SHA256SUMS-linux.txt
+            dist/release-manifest-linux.json
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finlegal-linux-${{ needs.validate-release.outputs.version }}
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/SHA256SUMS-linux.txt
+            dist/release-manifest-linux.json
+          if-no-files-found: error
+          retention-days: 30
+
+  build-windows:
+    name: Windows installer
+    needs: validate-release
+    runs-on: windows-2022
+    environment:
+      name: release
+      url: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-release.outputs.version }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies from lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Build signed NSIS installer
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          WIN_CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: npm run dist:windows -- --publish never
+
+      - name: Verify Authenticode signature
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem -Path dist -Filter '*.exe' | Select-Object -First 1
+          if ($null -eq $installer) { throw 'No Windows installer found.' }
+          $signature = Get-AuthenticodeSignature -FilePath $installer.FullName
+          if ($signature.Status -ne 'Valid') { throw "Invalid Authenticode signature: $($signature.Status)" }
+          if ($signature.SignerCertificate.Subject -notmatch 'FinLegal') { throw "Unexpected signer: $($signature.SignerCertificate.Subject)" }
+          if ($installer.VersionInfo.FileVersion -notmatch [regex]::Escape($RELEASE_VERSION)) { throw "Installer version mismatch." }
+          Write-Host "Verified signer: $($signature.SignerCertificate.Subject)"
+          Write-Host "Verified file: $($installer.FullName)"
+
+      - name: Generate Windows hashes and manifest
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+          SOURCE_SHA: ${{ needs.validate-release.outputs.source_sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(Get-ChildItem -Path dist -Filter '*.exe') + @(Get-ChildItem -Path dist -Filter '*.blockmap')
+          if ($files.Count -eq 0) { throw 'No Windows artifacts found.' }
+          $hashLines = foreach ($file in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -Path $file.FullName).Hash.ToLowerInvariant()
+            "$hash  $($file.Name)"
+          }
+          $hashLines | Set-Content -Encoding ascii dist/SHA256SUMS-windows.txt
+          $artifactRecords = foreach ($file in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -Path $file.FullName).Hash.ToLowerInvariant()
+            [ordered]@{ name = $file.Name; sha256 = $hash; size = $file.Length }
+          }
+          [ordered]@{ version = $RELEASE_VERSION; source_sha = $SOURCE_SHA; platform = 'windows-x64'; artifacts = @($artifactRecords) } |
+            ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 dist/release-manifest-windows.json
+
+      - name: Generate Windows artifact attestations
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/SHA256SUMS-windows.txt
+            dist/release-manifest-windows.json
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finlegal-windows-${{ needs.validate-release.outputs.version }}
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/SHA256SUMS-windows.txt
+            dist/release-manifest-windows.json
+          if-no-files-found: error
+          retention-days: 30
+
+  build-macos:
+    name: macOS disk image
+    needs: validate-release
+    runs-on: macos-13
+    environment:
+      name: release
+      url: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-release.outputs.version }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies from lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Build signed and notarized DMG
+        env:
+          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run dist:mac -- --publish never
+
+      - name: Verify macOS signature and notarization
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_PATH="$(find dist -maxdepth 2 -name '*.app' -type d | head -n 1 || true)"
+          DMG_PATH="$(find dist -maxdepth 1 -name '*.dmg' -type f | head -n 1 || true)"
+          [[ -n "$APP_PATH" ]] || { echo 'No .app bundle found.' >&2; exit 1; }
+          [[ -n "$DMG_PATH" ]] || { echo 'No .dmg found.' >&2; exit 1; }
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          spctl --assess --type execute --verbose=4 "$APP_PATH"
+          xcrun stapler validate "$APP_PATH"
+          xcrun stapler validate "$DMG_PATH"
+
+      - name: Generate macOS hashes and manifest
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+          SOURCE_SHA: ${{ needs.validate-release.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          shasum -a 256 dist/*.dmg dist/*.blockmap > dist/SHA256SUMS-macos.txt
+          printf '{"version":"%s","source_sha":"%s","platform":"macos-x64","artifacts":[' "$RELEASE_VERSION" "$SOURCE_SHA" > dist/release-manifest-macos.json
+          first=1
+          for file in dist/*.dmg dist/*.blockmap; do
+            [[ $first -eq 0 ]] && printf ',' >> dist/release-manifest-macos.json
+            first=0
+            hash="$(shasum -a 256 "$file" | cut -d' ' -f1)"
+            size="$(stat -f '%z' "$file")"
+            printf '{"name":"%s","sha256":"%s","size":%s}' "$(basename "$file")" "$hash" "$size" >> dist/release-manifest-macos.json
+          done
+          printf ']}\n' >> dist/release-manifest-macos.json
+
+      - name: Generate macOS artifact attestations
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: |
+            dist/*.dmg
+            dist/*.blockmap
+            dist/SHA256SUMS-macos.txt
+            dist/release-manifest-macos.json
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: finlegal-macos-${{ needs.validate-release.outputs.version }}
+          path: |
+            dist/*.dmg
+            dist/*.blockmap
+            dist/SHA256SUMS-macos.txt
+            dist/release-manifest-macos.json
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-release:
+    name: Publish immutable GitHub release
+    needs: [validate-release, build-linux, build-windows, build-macos]
+    runs-on: ubuntu-22.04
+    environment:
+      name: release
+      url: https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate-release.outputs.tag }}
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    if: ${{ needs.validate-release.result == 'success' && needs.build-linux.result == 'success' && needs.build-windows.result == 'success' && needs.build-macos.result == 'success' }}
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Set up GitHub CLI
+        shell: bash
+        run: gh --version
+
+      - name: Verify release asset set and hashes
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate-release.outputs.version }}
+          TAG: ${{ needs.validate-release.outputs.tag }}
+          SOURCE_SHA: ${{ needs.validate-release.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test -n "$(find release-assets -name '*.exe' -type f -print -quit)"
+          test -n "$(find release-assets -name '*.dmg' -type f -print -quit)"
+          test -n "$(find release-assets -name '*.AppImage' -type f -print -quit)"
+          test -n "$(find release-assets -name '*.deb' -type f -print -quit)"
+          test -f release-assets/SHA256SUMS-linux.txt
+          test -f release-assets/SHA256SUMS-windows.txt
+          test -f release-assets/SHA256SUMS-macos.txt
+          (cd release-assets && sha256sum -c SHA256SUMS-linux.txt)
+          (cd release-assets && sha256sum -c SHA256SUMS-windows.txt)
+          # macOS shasum output is compatible with sha256sum after normalizing names.
+          while read -r hash file; do
+            actual="$(sha256sum "release-assets/$file" | cut -d' ' -f1)"
+            [[ "$actual" == "$hash" ]] || { echo "Hash mismatch: $file" >&2; exit 1; }
+          done < <(sed 's/  / /' release-assets/SHA256SUMS-macos.txt)
+          grep -R '"version":"' release-assets/release-manifest-*.json >/dev/null
+          grep -R "${SOURCE_SHA}" release-assets/release-manifest-*.json >/dev/null
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Immutable publishing refuses replacement." >&2
+            exit 1
+          fi
+
+      - name: Create release notes
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate-release.outputs.version }}
+          SOURCE_SHA: ${{ needs.validate-release.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<EOF
+          FinLegal-Chat Enterprise Workspace v${VERSION}
+
+          Built from source revision ${SOURCE_SHA}.
+
+          The release includes platform installers, SHA-256 manifests, release manifests, and build provenance attestations. Windows and macOS signing verification completed in the platform build jobs.
+
+          Supported artifacts:
+          - Windows x64 NSIS installer
+          - macOS x64 DMG, signed and notarized when Apple secrets are configured
+          - Linux x64 AppImage and Debian package
+          EOF
+
+      - name: Create immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate-release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" release-assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "FinLegal-Chat Enterprise Workspace $TAG" \
+            --notes-file release-notes.md \
+            --verify-tag
