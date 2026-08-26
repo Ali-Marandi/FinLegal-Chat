@@ -1,17 +1,32 @@
-flet
-langchain
-langchain-openai
-langchain-community
-langgraph
-pypdf
-faiss-cpu
-openai
-tiktoken
-python-dotenv
-docx2txt
-pyinstaller
-plotly
-kaleido
-matplotlib
-llama-parse
-unstructured
+# FinLegal-Chat Ultimate v5.0.0 - Dependencies
+
+# Core UI
+flet>=0.25.0
+
+# AI & LangChain
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langchain-community>=0.3.0
+langgraph>=0.2.0
+langchain-text-splitters>=0.3.0
+
+# LLM Providers
+openai>=1.50.0
+
+# Document Processing
+pypdf>=4.0.0
+docx2txt>=0.8
+python-docx>=1.1.0
+openpyxl>=3.1.0
+
+# Vector Store
+faiss-cpu>=1.8.0
+
+# Tokenization
+tiktoken>=0.7.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# Build
+pyinstaller>=6.0.0

@@ -1,39 +1,52 @@
-# FinLegal-Chat Pro: Revolutionary AI Architecture (v2.0)
+# FinLegal-Chat Ultimate - Architecture
 
-## 1. Overview
+## System Overview
 
-FinLegal-Chat Pro (v2.0) is a state-of-the-art AI assistant specifically engineered for the high-stakes environments of Finance and Law. Unlike traditional RAG systems, it employs an **Agentic Workflow** that allows the AI to reason, self-correct, and analyze complex data structures like financial tables with human-like precision.
+FinLegal-Chat Ultimate is built on a multi-agent AI architecture orchestrated by LangGraph, with a professional Flet-based desktop UI and persistent SQLite storage.
 
-## 2. Revolutionary Components
+## Core Components
 
-### 2.1. Agentic RAG Core (LangGraph)
-The heart of the application is a directed acyclic graph (DAG) built with LangGraph. It consists of:
-*   **Retriever Node**: Fetches initial context from the FAISS vector store.
-*   **Grader Node**: An LLM-based judge that assesses the relevance of retrieved documents.
-*   **Query Transformer**: If retrieval is poor, this node rewrites the user query to optimize for semantic search.
-*   **Generator Node**: Synthesizes the final answer, citing specific context.
+### 1. AI Engine (`src/engine.py`)
+- **LangGraph DAG**: Fan-out/fan-in pattern for parallel agent execution
+- **5 Specialized Agents**: Legal, Financial, Market, Risk, and Synthesis
+- **FAISS Vector Store**: High-performance semantic retrieval
+- **Progress Callbacks**: Real-time UI updates during analysis
 
-### 2.2. Intelligent Data Visualization
-The system includes a **Data Analyst Agent** that:
-*   Detects financial figures and temporal data within documents.
-*   Automatically structures this data into JSON format.
-*   Renders interactive **Plotly charts** directly in the chat interface, allowing for instant trend analysis.
+### 2. Application Controller (`src/ui/app.py`)
+- Central orchestrator managing engine lifecycle, navigation, and state
+- Thread-safe query execution (background thread + UI thread sync)
+- Session management with SQLite persistence
 
-### 2.3. Hybrid Privacy Engine
-To meet the strict compliance requirements of legal and financial firms, the engine supports two modes:
-*   **Cloud Mode (OpenAI)**: Uses GPT-4o for maximum reasoning power.
-*   **Privacy Mode (Local LLM)**: Connects to a local Ollama instance (e.g., Llama 3) to ensure that sensitive documents never leave the user's machine.
+### 3. Configuration (`src/config.py`)
+- JSON-based settings with auto-save
+- XOR-obfuscated credential storage
+- Cross-platform config directory resolution
 
-### 2.4. High-Fidelity Ingestion
-Uses a multi-stage parsing strategy:
-*   **Semantic Chunking**: Breaks documents into meaningful sections rather than arbitrary character counts.
-*   **Layout Awareness**: Preserves the relationship between table headers and data points.
+### 4. Database (`src/database.py`)
+- SQLite with WAL journal mode
+- Tables: sessions, messages, documents, app_state
+- Thread-local connections for safety
 
-## 3. Advanced UI/UX
-The interface is built with Flet and follows "Pro-Dark" design principles:
-*   **Interactive Chat**: Supports rich text, code blocks, and embedded charts.
-*   **Real-time Feedback**: Progress bars and status indicators for agentic reasoning steps.
-*   **Configuration Dashboard**: Easy switching between cloud and local modes.
+### 5. UI Layer
+- **Theme System**: Brand colors, reusable style dictionaries
+- **Components**: AnimatedContainer, GlassCard, ChatBubble, ProgressBar, etc.
+- **Screens**: Chat, Settings, Documents, History
 
-## 4. CI/CD & Distribution
-The application is automatically packaged into a standalone Windows `.exe` via GitHub Actions, ensuring that the latest "Pro" features are always available for download in the Releases section.
+## AI Pipeline Flow
+
+```
+User Query
+    → Retrieve (FAISS top-K)
+    → [Legal Expert, Financial Expert, Market Analyst]  (parallel)
+    → Risk Manager
+    → Aggregator (Executive Report)
+    → Output + Auto-generated Reports (.docx, .xlsx)
+```
+
+## Data Flow
+
+```
+Document Upload → Ingestion → Text Splitting → Embedding → FAISS Index
+                                                              ↓
+User Query → Retriever → Agent Nodes → Final Report → DB + Files
+```
